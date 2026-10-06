@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tabpfn-xg"
+version = "0.1.0"
+description = "A football expected-goals demo using frozen TabPFN research results"
+readme = "README.md"
+requires-python = "~=3.14.0"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["tabpfn_xg*"]
+namespaces = false
