@@ -1,6 +1,6 @@
 # Hackathon task list
 
-This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–5 are implemented and ready for review; later tasks remain pending approval.
+This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–6 are implemented and ready for review; later tasks remain pending approval.
 
 ## Working agreement
 
@@ -24,7 +24,7 @@ This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small
 
 ## Task checklist
 
-Tasks 1–5 are implemented. Tasks 6 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
+Tasks 1–6 are implemented. Tasks 7 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
 
 ### 1. Review research and record provenance
 
@@ -71,7 +71,7 @@ Tasks 1–5 are implemented. Tasks 6 onward remain pending approval. The sequenc
 
 ### 6. Migrate model construction
 
-- [ ] Add explicit frozen model configuration and small prediction interfaces in `src/tabpfn_xg/models.py`.
+- [x] Add explicit frozen model configuration and small prediction interfaces in `src/tabpfn_xg/models.py`.
 - **Depends on:** 5.
 - **Acceptance:** Model settings agree with the manifest; importing the cached demo does not require a token or initialize hosted inference.
 - **Validation:** Configuration comparison and local interface tests with a fake model; no paid requests needed.
@@ -290,3 +290,23 @@ Review status:
 - **README updates:** Probability and calibration usage, exact frozen parameters/source, historical split roles, raw-vs-calibrated distinction, commands/results and limitations. Updated current task/test counts.
 - **Limitations/decisions needed:** Optional cache parity needs the trusted research snapshot. Calibration fitting, model construction, evaluation, data assets and UI remain later scope. No outstanding Task 5 question.
 - **Review status:** Task 5 implementation and compilation complete; ready for user review. Task 6 has not started or been authorized.
+
+### Task 6 — Migrate model construction (2026-10-06)
+
+- **Authorization:** User requested Task 6, review of Task 5/calibration and this checklist, documentation, tests and a commit. Scope/files/dependencies/validation detailed before implementation; stop after Task 6 for review. Task 5's earlier Task 6 authorization statement describes its earlier handoff state.
+- **Changed files:** `src/tabpfn_xg/models.py`, `tests/test_models.py`, `pyproject.toml`, `README.md`, `provenance/TASK_6_MODELS.md`, `TASKS.md`.
+- **Findings:** Frozen configuration matches both main settings and extra constructor options. Model packages are imported only by explicit construction. Fit and prediction preserve input rows/features, validate schema and label alignment, reuse positive-class/probability checks, and apply explicit calibration once. Cached calibrated CSV values bypass model construction and calibration.
+- **Validation commands:**
+  - `.venv/bin/python -m unittest discover -s tests -p 'test_models.py' -v` — all eight new offline tests passed.
+  - `.venv/bin/python -m compileall -q src scripts tests` — passed.
+  - `.venv/bin/python -m unittest discover -s tests -v` — 42 passed, ten source-dependent tests skipped.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v` — all 52 passed.
+  - `.venv/bin/python -m pip install --no-deps -e .` — editable build/install passed after retry with approved network access for setuptools; sandbox attempt failed DNS. Initial `--no-build-isolation --no-deps` attempt failed because local setuptools is absent.
+  - `.venv/bin/python -I -c 'from importlib.metadata import metadata; import tabpfn_xg.models; m=metadata("tabpfn-xg"); print(m.get_all("Provides-Extra")); print(m.get_all("Requires-Dist"))'` — import passed; installed metadata contains `catboost==1.2.10` and `tabpfn-client==0.6.1` only in their optional extras.
+  - `.venv/bin/python -m pip check` — passed, no broken requirements.
+  - `git diff --check` — passed.
+- **Results:** Python 3.14.5. Fake models verify constructors without fitting, exact manifest settings, token-free import with optional imports blocked, missing dependencies, unchanged aligned fit context, reversed class mapping, calibration, rejected schema/labels, empty predictions without client calls and propagated service errors. Existing feature/calibration parity and all 76 source hashes pass. No real model fitting, inference, research changes or frozen-result changes.
+- **Frontend validation:** Not applicable; no frontend code or tests.
+- **README updates:** Frozen settings; cached-mode boundary; recorded-version optional extras; explicit fit/raw/calibrated usage; exact historical context responsibility; checks/results and limitations.
+- **Limitations/decisions needed:** Optional model installation/real client compatibility and inference were not rerun. Exact historical fit-context reconstruction and shot-ID enforcement remain Tasks 9–10; hosted credentials and UI fallback remain Task 15. No outstanding Task 6 question.
+- **Review status:** Task 6 implementation and compilation complete; ready for user review. Task 7 has not started or been authorized.

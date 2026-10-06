@@ -2,7 +2,7 @@
 
 Hackathon project in preparation: explore football scoring chances with TabPFN-3.5, compare predictions, and test your football intuition.
 
-Tasks 1–5 (research review, package setup, event conversion, the shared 50-feature builder, and probability checks/calibration) are implemented and ready for review. Models and the application remain later tasks. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
+Tasks 1–6 (research review, package setup, event conversion, the shared 50-feature builder, probability checks/calibration, and model construction/interfaces) are implemented and ready for review. The application remains a later task. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
 
 The supported Python release series is 3.14 (`>=3.14,<3.15`). Development setup was verified in a fresh virtual environment with Python 3.14.5:
 
@@ -16,7 +16,7 @@ python -m unittest discover -s tests -v
 python -m pip check
 ```
 
-Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 34 portable backend tests; ten additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. No app or experiment extras are available yet; their dependencies will be added alongside the migrated capabilities. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
+Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 42 portable backend tests; ten additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. Optional model extras are described below; no app extra is available yet. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
 
 The implementation will come from the original acquisition/processing notebooks and the frozen geometry/external research pipeline. The [portable provenance manifest](provenance/research_manifest.json) records 76 source hashes, exact ordered 8,000 fit shot IDs, historical/external match IDs, ordered 50 features, model settings and calibration. The [research handoff](provenance/RESEARCH_HANDOFF.md) explains migration pitfalls, artifact sizes, verification results and unresolved historical acquisition metadata.
 
@@ -66,7 +66,7 @@ the seven recognized other outcomes map to 0. Feet share one category, and
 missing boolean flags become zero. Coordinates use the StatsBomb 120×80 pitch;
 distances use coordinate units and angles use radians. Pass this output to
 `features.build_features` to append the 13 pressure/coverage predictors in the
-frozen order. Model interfaces are a later task.
+frozen order. Pass that feature table to the model interfaces described below.
 
 Flattened inputs need the fields listed in `data.RAW_COLUMNS`; the four flag
 columns may be omitted. Non-shot native events are ignored. Missing required
@@ -228,3 +228,86 @@ and `1.67e-16` for TabPFN. Cache shot IDs match CSV row order exactly, and all
 76 provenance hashes remain unchanged. Source-dependent checks are read-only;
 there were no frontend checks, model fitting or paid/live inference. No new
 dependencies were added. See [Task 5 findings](provenance/TASK_5_CALIBRATION.md).
+
+## Frozen model interfaces
+
+The [model module](src/tabpfn_xg/models.py) exposes immutable `CATBOOST_CONFIG`
+and `TABPFN_CONFIG`, matching the manifest's settings and constructor options.
+CatBoost uses depth 4, 200 iterations, learning rate 0.1, L2 penalty 10, seed
+123, four threads, no verbose output and no file writing. TabPFN uses
+`v3.5_default`, four estimators, seed 123, `thinking_mode=False`,
+`fit_mode='fit_preprocessors'` and `inference_precision='auto'`.
+
+Importing this module needs neither a token nor either optional model package.
+Cached mode uses the previously calibrated CSV predictions and
+`calibration.probability_check`; it never constructs/fits a model or recalibrates
+those values. Portable assets and the cached application are still later tasks.
+
+Optional extras pin the model package versions recorded in the research
+manifest. Install only the extra needed for explicit model work:
+
+```sh
+python -m pip install -e '.[catboost]'  # catboost==1.2.10
+python -m pip install -e '.[tabpfn]'    # tabpfn-client==0.6.1
+```
+
+These optional installations and real client construction/inference have not
+been rerun in this repository. This task checks the interfaces with fake models;
+it does not provide token setup or authorize paid requests. Optional live
+inference remains Task 15.
+
+For a caller with an explicitly prepared fit context and query table:
+
+```python
+from tabpfn_xg.models import make_model, fit_model, predict_raw, predict_calibrated
+from tabpfn_xg.calibration import CATBOOST_CALIBRATION
+
+# fit_x: exact ordered 8,000 historical fit shots, 50 FEATURES columns.
+# fit_y: aligned binary outcomes; query_x: the same ordered feature schema.
+model = make_model("catboost")  # Explicit construction; does not fit.
+fit_model(model, fit_x, fit_y)
+raw = predict_raw(model, query_x)
+calibrated = predict_calibrated(model, query_x, CATBOOST_CALIBRATION)
+```
+
+`predict_calibrated` makes its own prediction and calibrates it once. To reuse
+`raw` without another prediction, use `apply_calibration(raw, CATBOOST_CALIBRATION)`.
+For TabPFN, use `make_model('tabpfn')` and `TABPFN_CALIBRATION`; real hosted
+fit/predict calls may incur charges. Construction is lazy, not a cached-mode
+operation. `make_model(..., factory=...)` accepts an offline constructor for tests.
+
+Fit and query inputs must be DataFrames containing exactly `FEATURES` in order,
+with finite real numeric values. Fit requires both binary classes, aligned
+one-dimensional labels, and an identical index when labels are a Series.
+Rows, index and labels are passed unchanged; there is no resampling or scaling.
+Empty query batches return empty probabilities without calling the model.
+Probability/class validation reuses Task 5; service errors propagate to the
+caller, with application fallback deferred to Task 15.
+
+The caller must supply the exact ordered 8,000-shot context recorded in
+`external_experiment.fit_shot_ids`, including its historical outcomes and
+50-feature geometry. Configuration alone cannot reproduce predictions.
+`fit_model` checks input schema and labels, not shot-ID provenance; historical
+context reconstruction and enforcement in the experiment command remain Tasks
+9–10. Frozen calibration is already supplied and must not be refitted on queries.
+
+Task 6 validation on Python 3.14.5:
+
+```sh
+.venv/bin/python -m pip install --no-deps -e .
+.venv/bin/python -I -c 'from importlib.metadata import metadata; import tabpfn_xg.models; m=metadata("tabpfn-xg"); print(m.get_all("Provides-Extra")); print(m.get_all("Requires-Dist"))'
+.venv/bin/python -m compileall -q src scripts tests
+.venv/bin/python -m unittest discover -s tests -v
+TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pip check
+git diff --check
+```
+
+Editable build/install, metadata import, compilation, dependency and diff checks
+passed. Portable suite: 42 passed, ten skipped; source-enabled suite: all 52
+passed, including unchanged frozen cache calibration, feature parity and all
+76 source hashes. Eight new offline tests cover constructor settings, lazy
+imports without a token, dependency errors, aligned fit inputs, reversed class
+mapping, calibration, rejected inputs, empty batches and service failures.
+No real model fitting/inference or frontend checks were performed. See
+[Task 6 findings](provenance/TASK_6_MODELS.md).
