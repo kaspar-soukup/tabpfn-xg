@@ -2,7 +2,7 @@
 
 Hackathon project in preparation: explore football scoring chances with TabPFN-3.5, compare predictions, and test your football intuition.
 
-Tasks 1–4 (research review, package setup, event conversion, and the shared 50-feature builder) are implemented and ready for review. Models and the application remain later tasks. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
+Tasks 1–5 (research review, package setup, event conversion, the shared 50-feature builder, and probability checks/calibration) are implemented and ready for review. Models and the application remain later tasks. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
 
 The supported Python release series is 3.14 (`>=3.14,<3.15`). Development setup was verified in a fresh virtual environment with Python 3.14.5:
 
@@ -16,7 +16,7 @@ python -m unittest discover -s tests -v
 python -m pip check
 ```
 
-Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 24 portable conversion/geometry tests; nine additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. No app or experiment extras are available yet; their dependencies will be added alongside the migrated capabilities. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
+Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 34 portable backend tests; ten additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. No app or experiment extras are available yet; their dependencies will be added alongside the migrated capabilities. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
 
 The implementation will come from the original acquisition/processing notebooks and the frozen geometry/external research pipeline. The [portable provenance manifest](provenance/research_manifest.json) records 76 source hashes, exact ordered 8,000 fit shot IDs, historical/external match IDs, ordered 50 features, model settings and calibration. The [research handoff](provenance/RESEARCH_HANDOFF.md) explains migration pitfalls, artifact sizes, verification results and unresolved historical acquisition metadata.
 
@@ -73,7 +73,7 @@ columns may be omitted. Non-shot native events are ignored. Missing required
 fields, unknown eligible categories/outcomes, duplicate eligible shot IDs,
 missing eligible identifiers, malformed frame players, and invalid observed
 shot/keeper coordinates raise actionable errors. Reference xG is carried through
-unchanged; probability validation is a later capability.
+unchanged; use `calibration.probability_check` before consuming it as a probability.
 
 Source events and the original acquisition notebooks use
 [StatsBomb Open Data](https://github.com/hudl/open-data). Preserve StatsBomb
@@ -167,3 +167,64 @@ checks confirm all 76 source hashes are unchanged. These optional checks read
 trusted local research data; they are not a public-data preparation command.
 No model fitting, inference or frontend checks were performed. See the
 [Task 4 findings](provenance/TASK_4_FEATURES.md).
+
+## Probability checks and frozen calibration
+
+The [calibration module](src/tabpfn_xg/calibration.py) validates probability
+vectors and maps goal probabilities through a binary model's `classes_`.
+`positive_probability(model, x)` calls `predict_proba(x)`, requires exactly
+classes 0 and 1 in either order, and validates both columns, shape and row sums.
+It does not construct or fit a model. `probability_check(p, n)` requires a
+one-dimensional vector of exactly `n` finite values in `[0,1]`; endpoints and
+empty batches are valid. Invalid inputs raise `ValueError` with the failed
+requirement. Row sums preserve the research tolerance (`rtol=1e-5`, `atol=1e-8`).
+
+For raw probabilities already obtained from the frozen geometry models:
+
+```python
+from tabpfn_xg.calibration import (
+    CATBOOST_CALIBRATION, TABPFN_CALIBRATION,
+    apply_calibration, probability_check,
+)
+
+raw_tabpfn = probability_check([0.1, 0.5, 0.9], 3)
+calibrated_tabpfn = apply_calibration(raw_tabpfn, TABPFN_CALIBRATION)
+calibrated_catboost = apply_calibration([0.1, 0.5, 0.9], CATBOOST_CALIBRATION)
+```
+
+Calibration adjusts probabilities using
+`sigmoid(a * logit(clip(p, 1e-7, 1 - 1e-7)) + b)`. The immutable
+`Calibration` configuration contains `a`, `b` and `clip`. Frozen CatBoost
+parameters are `[1.0123564537857361, 0.08384092826439743]`; TabPFN parameters
+are `[1.023112240680613, 0.070507598294854]`. They are recorded in
+`external_experiment.frozen_selection` in the
+[manifest](provenance/research_manifest.json), from
+`results/xg_geometry/selection.json`. They were learned on separate historical
+calibration matches and selected on historical validation matches before the
+external test. No refitting is implemented. Calibration cannot guarantee
+accuracy for one shot or a new population.
+
+Apply calibration once to raw model probabilities. The external raw NPZ caches
+contain uncalibrated values; `evaluation_predictions.csv` already contains
+calibrated CatBoost/TabPFN values. Do not calibrate that CSV again or apply these
+model-specific parameters to the supplied StatsBomb xG.
+
+Task 5 validation on Python 3.14.5:
+
+```sh
+.venv/bin/python -m compileall -q src scripts tests
+.venv/bin/python -m unittest discover -s tests -v
+TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pip check
+git diff --check
+```
+
+Compilation, dependency and diff checks passed. Portable suite: 34 passed,
+ten source-dependent tests skipped. With the recorded research snapshot: all
+44 backend tests passed. Applying the frozen parameters to each model's 908 raw
+cached probabilities reproduces its external CSV values within `2e-14` absolute
+tolerance (`rtol=0`); measured maximum differences are `1.11e-16` for CatBoost
+and `1.67e-16` for TabPFN. Cache shot IDs match CSV row order exactly, and all
+76 provenance hashes remain unchanged. Source-dependent checks are read-only;
+there were no frontend checks, model fitting or paid/live inference. No new
+dependencies were added. See [Task 5 findings](provenance/TASK_5_CALIBRATION.md).

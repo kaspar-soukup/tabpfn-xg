@@ -1,6 +1,6 @@
 # Hackathon task list
 
-This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–4 are implemented and ready for review; later tasks remain pending approval.
+This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–5 are implemented and ready for review; later tasks remain pending approval.
 
 ## Working agreement
 
@@ -24,7 +24,7 @@ This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small
 
 ## Task checklist
 
-Tasks 1–4 are implemented. Tasks 5 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
+Tasks 1–5 are implemented. Tasks 6 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
 
 ### 1. Review research and record provenance
 
@@ -63,7 +63,7 @@ Tasks 1–4 are implemented. Tasks 5 onward remain pending approval. The sequenc
 
 ### 5. Migrate probability checks and calibration
 
-- [ ] Extract positive-class mapping, probability validation, and frozen calibration application.
+- [x] Extract positive-class mapping, probability validation, and frozen calibration application.
 - **Depends on:** 2, 4.
 - **Acceptance:** Reversed class ordering is handled correctly; invalid probabilities fail clearly; frozen calibration reproduces research outputs.
 - **Validation:** Port positive-class and calibration tests, including relevant edge cases.
@@ -273,3 +273,20 @@ Review status:
 - **README updates:** Shared builder usage, full schema/metadata separation, groups, coordinates, frozen settings, validation errors, missing observations, coverage limitations, exact commands/results and findings link.
 - **Limitations/decisions needed:** Source parity requires the explicitly supplied trusted research snapshot. Models, calibration, public acquisition and distribution remain later tasks. One initial fixture incorrectly expected zero ray coverage for a goal-centre player; corrected the fixture after inspecting the frozen projection rule. No unresolved Task 4 question.
 - **Review status:** Task 4 implementation and compilation complete; ready for user review. Task 5 has not started or been authorized.
+
+### Task 5 — Migrate probability checks and calibration (2026-10-06)
+
+- **Authorization:** User requested Task 5, review of Task 4 provenance and the task checklist, change verification and a commit. Scope/files/dependencies/validation detailed before implementation; stop after this task for review. Earlier Task 4 handoff statements about Task 5 authorization describe their earlier state.
+- **Changed files:** `src/tabpfn_xg/calibration.py`, `tests/test_calibration.py`, `tests/test_calibration_parity.py`, `provenance/TASK_5_CALIBRATION.md`, `README.md`, `TASKS.md`.
+- **Findings:** Preserved class-1 lookup through either binary class order, source row-sum tolerance, frozen geometry coefficients and clipping. Added actionable probability/configuration errors, validation of both class columns, and immutable explicit calibration configuration. NumPy implements logit and a stable sigmoid; no SciPy/model dependencies or calibration optimizer needed for frozen application.
+- **Validation commands/results (Python 3.14.5):**
+  - `.venv/bin/python -m compileall -q src scripts tests` — passed.
+  - `.venv/bin/python -m unittest discover -s tests -v` — 34 portable backend tests passed; ten source-dependent tests skipped.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v` — all 44 backend tests passed, including raw-cache calibration reproduction and all 76 provenance hashes.
+  - `.venv/bin/python -m pip check` — passed, no broken requirements.
+  - `git diff --check` and `git diff --cached --check` — passed before commit.
+- **Results:** Both 908-row raw caches match frozen CSV shot-ID order and reproduce calibrated probabilities at `atol=2e-14`, `rtol=0`. Maximum absolute differences: CatBoost `1.1102230246251565e-16`; TabPFN `1.6653345369377348e-16`. Tests cover reversed classes, malformed classes/matrices/vectors, non-finite/out-of-range/complex values, endpoints, clipping, empty batches, known distortion, monotonicity, immutable configuration and stable large-coefficient behavior. No research files, frozen parameters, fit IDs, cached outputs or model settings changed.
+- **Frontend validation:** Not applicable; no frontend tests or UI checks.
+- **README updates:** Probability and calibration usage, exact frozen parameters/source, historical split roles, raw-vs-calibrated distinction, commands/results and limitations. Updated current task/test counts.
+- **Limitations/decisions needed:** Optional cache parity needs the trusted research snapshot. Calibration fitting, model construction, evaluation, data assets and UI remain later scope. No outstanding Task 5 question.
+- **Review status:** Task 5 implementation and compilation complete; ready for user review. Task 6 has not started or been authorized.
