@@ -1,6 +1,6 @@
 # Hackathon task list
 
-This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–3 are implemented and ready for review; later tasks remain pending approval.
+This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–4 are implemented and ready for review; later tasks remain pending approval.
 
 ## Working agreement
 
@@ -24,7 +24,7 @@ This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small
 
 ## Task checklist
 
-Tasks 1–3 are implemented. Tasks 4 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
+Tasks 1–4 are implemented. Tasks 5 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
 
 ### 1. Review research and record provenance
 
@@ -54,8 +54,8 @@ Tasks 1–3 are implemented. Tasks 4 onward remain pending approval. The sequenc
 
 ### 4. Migrate the shared feature builder
 
-- [ ] Extract the ordered 50-feature schema and geometry calculations into `src/tabpfn_xg/features.py`.
-- [ ] Port meaningful geometry tests and add a research parity check.
+- [x] Extract the ordered 50-feature schema and geometry calculations into `src/tabpfn_xg/features.py`.
+- [x] Port meaningful geometry tests and add a research parity check.
 - **Depends on:** 3.
 - **Acceptance:** Feature names, order, values, and missing-observation behavior match the research implementation within a stated numerical tolerance.
 - **Validation:** Keeper/teammate exclusion, blockers, missing observations, degenerate geometry, symmetry, and representative source parity fixtures.
@@ -256,3 +256,20 @@ Review status:
 - **README updates:** Native JSON/flattened input usage, ordered output/metadata separation, eligibility, validation errors, coordinate conventions, source attribution, dependencies, exact validation commands/results and limitations.
 - **Limitations/decisions needed:** Additional 13 geometry features remain Task 4; data downloads, model/calibration/evaluation interfaces and distribution remain later tasks. Optional parity checks require trusted local source data. No outstanding Task 3 requirement question.
 - **Review status:** Task 3 implementation and compilation complete; ready for user review. Stop here; Task 4 is not started or authorized.
+
+### Task 4 — Migrate the shared feature builder (2026-10-06)
+
+- **Authorization:** User requested Task 4, prior-document review, findings, tests and a commit. Scope/files/dependencies/validation detailed before implementation; stop after this task for review.
+- **Changed files:** `src/tabpfn_xg/features.py`, `src/tabpfn_xg/data.py` (schema comment), `tests/test_features.py`, `tests/test_features_parity.py`, `provenance/TASK_4_FEATURES.md`, `README.md`, `TASKS.md`.
+- **Findings:** Preserved ordered 37+9+4 schema, exact geometric arithmetic/settings, missing/empty distinction, invalid-entry counting, strict opposition flag, keeper ID/name exclusion, inclusive triangle bounds and strict ray projection. Immutable explicit configuration replaces the source's mutable CONFIG dictionary. Full builder reuses base columns and rebuilds added geometry through an input allowlist; metadata stays separate. No new dependencies.
+- **Validation commands/results (Python 3.14.5; NumPy 2.5.3; pandas 2.3.3):**
+  - `.venv/bin/python -m compileall -q src scripts tests` — passed.
+  - `.venv/bin/python -m unittest discover -s tests -v` — 24 portable backend tests passed; nine source-dependent tests skipped.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v` — all 33 backend tests passed, including full historical/external feature parity and all 76 provenance hashes.
+  - `.venv/bin/python -m pip check` — passed, no broken requirements.
+  - `git diff --check` and `git diff --cached --check` — passed before commit.
+- **Results:** All 45,185 historical rows match the frozen 13-feature table; all 908 external rows match the frozen 50-feature table after alignment by unique shot ID, at absolute tolerance `2e-14`, `rtol=0`. Additional source parity covers missing/non-list/empty frames, invalid players and goal-line degeneracy. Existing conversion/provenance tests continue to pass. Research inputs, cached predictions, fit IDs, calibration and results are unchanged.
+- **Frontend validation:** Not applicable; no frontend tests or UI checks.
+- **README updates:** Shared builder usage, full schema/metadata separation, groups, coordinates, frozen settings, validation errors, missing observations, coverage limitations, exact commands/results and findings link.
+- **Limitations/decisions needed:** Source parity requires the explicitly supplied trusted research snapshot. Models, calibration, public acquisition and distribution remain later tasks. One initial fixture incorrectly expected zero ray coverage for a goal-centre player; corrected the fixture after inspecting the frozen projection rule. No unresolved Task 4 question.
+- **Review status:** Task 4 implementation and compilation complete; ready for user review. Task 5 has not started or been authorized.

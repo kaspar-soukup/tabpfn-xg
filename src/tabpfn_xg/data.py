@@ -8,7 +8,7 @@ import math
 import numpy as np
 import pandas as pd
 
-# Task 4 will reuse this order when appending the 13 geometry predictors.
+# The shared feature builder appends 13 geometry predictors to this order.
 BASE_FEATURES = (
     'under_pressure',
     'shot_open_goal',

@@ -2,7 +2,7 @@
 
 Hackathon project in preparation: explore football scoring chances with TabPFN-3.5, compare predictions, and test your football intuition.
 
-Tasks 1 (research review), 2 (package setup), and 3 (event conversion) are implemented and ready for review. The shared 50-feature builder, models, and application remain later tasks. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
+Tasks 1–4 (research review, package setup, event conversion, and the shared 50-feature builder) are implemented and ready for review. Models and the application remain later tasks. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
 
 The supported Python release series is 3.14 (`>=3.14,<3.15`). Development setup was verified in a fresh virtual environment with Python 3.14.5:
 
@@ -16,7 +16,7 @@ python -m unittest discover -s tests -v
 python -m pip check
 ```
 
-Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 11 portable conversion tests; six additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. No app or experiment extras are available yet; their dependencies will be added alongside the migrated capabilities. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
+Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 24 portable conversion/geometry tests; nine additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. No app or experiment extras are available yet; their dependencies will be added alongside the migrated capabilities. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
 
 The implementation will come from the original acquisition/processing notebooks and the frozen geometry/external research pipeline. The [portable provenance manifest](provenance/research_manifest.json) records 76 source hashes, exact ordered 8,000 fit shot IDs, historical/external match IDs, ordered 50 features, model settings and calibration. The [research handoff](provenance/RESEARCH_HANDOFF.md) explains migration pitfalls, artifact sizes, verification results and unresolved historical acquisition metadata.
 
@@ -64,9 +64,9 @@ Output has 37 ordered base predictors followed by `id`, `match_id`,
 The supplied xG and outcome are metadata, never predictors. Goal maps to 1;
 the seven recognized other outcomes map to 0. Feet share one category, and
 missing boolean flags become zero. Coordinates use the StatsBomb 120×80 pitch;
-distances use coordinate units and angles use radians. The additional 13
-pressure/coverage predictors belong to Task 4; this output is not yet ready for
-50-feature model inference.
+distances use coordinate units and angles use radians. Pass this output to
+`features.build_features` to append the 13 pressure/coverage predictors in the
+frozen order. Model interfaces are a later task.
 
 Flattened inputs need the fields listed in `data.RAW_COLUMNS`; the four flag
 columns may be omitted. Non-shot native events are ignored. Missing required
@@ -96,3 +96,74 @@ parity for 45,185 historical and 908 external shots at absolute tolerance
 `2e-14`, identical labels/IDs, and unchanged external reference xG. Source checks
 read trusted local pickles and JSON only; never load an untrusted pickle. No
 model fitting, inference, or frontend testing was performed.
+
+## Shared feature builder
+
+The [shared builder](src/tabpfn_xg/features.py) uses converted shots from the
+example above:
+
+```python
+from tabpfn_xg.features import FEATURES, build_features, build_geometry_features
+
+x = build_features(shots)  # Exactly 50 columns; metadata stays in shots.
+assert tuple(x.columns) == FEATURES
+extra = build_geometry_features(shots)  # Just the 13 added predictors.
+```
+
+Both builders preserve row order and index, including repeated index labels.
+`FEATURES` reuses the converter's 37 `BASE_FEATURES`, then appends nine
+`PRESSURE_FEATURES` and four `GEOMETRY_FEATURES`. Base values are reused;
+geometry is rebuilt from shooter coordinates, keeper coordinates and the freeze
+frame. Outcomes, provider xG, shot-end coordinates and extra input columns cannot
+influence the added features. Missing/duplicate required columns, non-finite
+predictors and invalid shot/keeper coordinates raise `ValueError`. Empty input
+with the required columns returns an empty table with the ordered schema.
+
+| Group | Predictors |
+| --- | --- |
+| Base (37) | Original flags, categorical indicators, shooter/keeper positions, distances and shot angle |
+| Pressure (9) | Visible defender count/presence, missing frame and invalid-player counts, nearest defender distance, counts within 2/5 units and the goal triangle, nearest defender to the shooting line |
+| Coverage (4) | Defender and keeper goal coverage, unobstructed goal fraction, keeper offset from the shooter–goal-centre segment |
+
+Coordinates use a 120×80 pitch with goal centre `(120,40)` and posts `(120,36)`
+and `(120,44)`. Distances are coordinate units, not metres; base angles are
+radians. The immutable default `GeometryConfig` preserves defender radius 0.6,
+keeper radius 0.9, 101 evenly spaced goalface samples, and the pitch-diagonal
+missing-distance sentinel `hypot(120,80)` (about 144.22). Use these defaults for
+frozen-model reproduction; no settings were tuned during migration.
+
+Only visible opposition outfield players with valid locations count as
+defenders. Keeper detection here accepts position ID 1 **or** name
+`Goalkeeper`; conversion's original keeper selection still requires the name.
+Invalid player entries/locations are counted before filtering teammates. A
+missing/non-list frame differs from an empty list; both have no observed
+defenders. No observed defenders gives zero defender counts/coverage and sentinel
+defender distances; keeper coverage still uses the selected keeper. Degenerate goal-line triangles count zero blockers and remain finite.
+Triangle boundaries are included with tolerance `1e-10`.
+
+Coverage is the fraction of rays whose segment has a player centre projected
+strictly between its endpoints and within the fixed radius. Overlap is counted
+once for the unobstructed fraction. A player at goal centre may still project
+inside a ray aimed at another goalface point. Freeze frames show visible players,
+not complete tracking: zero observed blockers does not establish an empty
+defence. Coverage approximates circles in a plane; it omits height, stance,
+movement and ball trajectory.
+
+Task 4 validation on Python 3.14.5, NumPy 2.5.3 and pandas 2.3.3:
+
+```sh
+.venv/bin/python -m compileall -q src scripts tests
+.venv/bin/python -m unittest discover -s tests -v
+TABPFN_RESEARCH_ROOT=/path/to/tabPFN .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pip check
+```
+
+Compilation and dependency checks passed. Portable suite: 24 passed, nine
+skipped; with the recorded research snapshot, all 33 backend tests passed.
+All 45,185 historical geometry rows and all 908 external rows with 50 predictors
+match the frozen CSVs at absolute tolerance `2e-14` (`rtol=0`). Additional source
+parity fixtures verify missing, invalid and degenerate observations; provenance
+checks confirm all 76 source hashes are unchanged. These optional checks read
+trusted local research data; they are not a public-data preparation command.
+No model fitting, inference or frontend checks were performed. See the
+[Task 4 findings](provenance/TASK_4_FEATURES.md).
