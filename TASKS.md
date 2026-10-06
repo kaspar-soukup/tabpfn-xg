@@ -1,6 +1,6 @@
 # Hackathon task list
 
-This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–6 are implemented and ready for review; later tasks remain pending approval.
+This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–7 are implemented and ready for review; later tasks remain pending approval.
 
 ## Working agreement
 
@@ -24,7 +24,7 @@ This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small
 
 ## Task checklist
 
-Tasks 1–6 are implemented. Tasks 7 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
+Tasks 1–7 are implemented. Tasks 8 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
 
 ### 1. Review research and record provenance
 
@@ -79,7 +79,7 @@ Tasks 1–6 are implemented. Tasks 7 onward remain pending approval. The sequenc
 
 ### 7. Migrate sampling and evaluation
 
-- [ ] Extract sampling, metrics, and paired match-bootstrap utilities into `src/tabpfn_xg/evaluation.py`.
+- [x] Extract sampling, metrics, and paired match-bootstrap utilities into `src/tabpfn_xg/evaluation.py`.
 - **Depends on:** 2, 5.
 - **Acceptance:** Sampling and evaluation preserve the research protocol and reproducibility.
 - **Validation:** Port nested sampling and clustered bootstrap tests; compare reported metrics against frozen predictions.
@@ -310,3 +310,22 @@ Review status:
 - **README updates:** Frozen settings; cached-mode boundary; recorded-version optional extras; explicit fit/raw/calibrated usage; exact historical context responsibility; checks/results and limitations.
 - **Limitations/decisions needed:** Optional model installation/real client compatibility and inference were not rerun. Exact historical fit-context reconstruction and shot-ID enforcement remain Tasks 9–10; hosted credentials and UI fallback remain Task 15. No outstanding Task 6 question.
 - **Review status:** Task 6 implementation and compilation complete; ready for user review. Task 7 has not started or been authorized.
+
+
+### Task 7 — Migrate sampling and evaluation (2026-10-06)
+
+- **Authorization:** User explicitly requested Task 7. Scope, files, existing dependencies and validation detailed before implementation; stop after this task for review.
+- **Changed files:** `src/tabpfn_xg/evaluation.py`, `tests/test_evaluation.py`, `README.md`, `TASKS.md`.
+- **Implementation:** Migrated proportional nested sampling, binary metrics and paired whole-match bootstrap with explicit seed/replicate arguments and input validation. Preserved RNG order, ties-to-even class counts, shot weighting, percentile intervals and source clipping conventions. NumPy/pandas implement metrics without adding scikit-learn or model dependencies. Source sampling/evaluation comes from `scripts/xg_tabpfn_pilot.py`; external invocation and frozen CSV/JSON outputs define parity. Notebook acquisition context remains the historical 2015/16 data.
+- **Validation commands/results (Python 3.14.5):**
+  - `.venv/bin/python -m compileall -q src scripts tests` — passed.
+  - `.venv/bin/python -m unittest discover -s tests -p 'test_evaluation.py' -v` — eight passed, two source-dependent tests skipped.
+  - `.venv/bin/python -m unittest discover -s tests -v` — 50 passed, 12 source-dependent tests skipped.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v` — all 62 passed.
+  - `.venv/bin/python -m pip check` — passed, no broken requirements.
+  - `git diff --check` — passed before commit.
+- **Results:** Exact ordered 8,000 fit shot IDs reproduced; four historical roles verified match-disjoint. All metrics for three models on 908 shots/34 matches and both paired bootstrap comparisons reproduce frozen outputs at `atol=2e-14`, `rtol=0`. Portable tests cover nesting, prevalence/rounding, reproducibility, pool boundaries, tied AUC, endpoints, single-class AUC, identical models, unequal cluster sizes, difference direction, singleton match intervals and malformed inputs. All 76 research hashes remain unchanged.
+- **Frontend validation:** Not applicable; no frontend code or tests.
+- **README updates:** Utility usage, positional alignment, sampling protocol, historical split roles, metric meanings, paired uncertainty, clipping distinctions, evidence limitations, exact commands and results.
+- **Limitations/decisions needed:** Source parity requires the trusted research snapshot and reads a local pickle. Split reconstruction, portable assets and experiment CLI remain Tasks 8–10. No live/paid inference, model fitting, external tuning or new dependencies. No outstanding Task 7 questions.
+- **Review status:** Task 7 implementation and compilation complete; ready for user review. Task 8 has not started or been authorized.

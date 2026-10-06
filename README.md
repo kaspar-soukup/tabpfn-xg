@@ -2,7 +2,7 @@
 
 Hackathon project in preparation: explore football scoring chances with TabPFN-3.5, compare predictions, and test your football intuition.
 
-Tasks 1–6 (research review, package setup, event conversion, the shared 50-feature builder, probability checks/calibration, and model construction/interfaces) are implemented and ready for review. The application remains a later task. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
+Tasks 1–7 (research review, package setup, event conversion, the shared 50-feature builder, probability checks/calibration, model construction/interfaces, and sampling/evaluation) are implemented and ready for review. The application remains a later task. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
 
 The supported Python release series is 3.14 (`>=3.14,<3.15`). Development setup was verified in a fresh virtual environment with Python 3.14.5:
 
@@ -16,7 +16,7 @@ python -m unittest discover -s tests -v
 python -m pip check
 ```
 
-Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 42 portable backend tests; ten additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. Optional model extras are described below; no app extra is available yet. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
+Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 50 portable backend tests; twelve additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. Optional model extras are described below; no app extra is available yet. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
 
 The implementation will come from the original acquisition/processing notebooks and the frozen geometry/external research pipeline. The [portable provenance manifest](provenance/research_manifest.json) records 76 source hashes, exact ordered 8,000 fit shot IDs, historical/external match IDs, ordered 50 features, model settings and calibration. The [research handoff](provenance/RESEARCH_HANDOFF.md) explains migration pitfalls, artifact sizes, verification results and unresolved historical acquisition metadata.
 
@@ -311,3 +311,85 @@ imports without a token, dependency errors, aligned fit inputs, reversed class
 mapping, calibration, rejected inputs, empty batches and service failures.
 No real model fitting/inference or frontend checks were performed. See
 [Task 6 findings](provenance/TASK_6_MODELS.md).
+
+
+## Sampling and evaluation
+
+The [evaluation module](src/tabpfn_xg/evaluation.py) provides offline utilities
+using the existing NumPy/pandas dependencies:
+
+```python
+from tabpfn_xg.evaluation import sample_rows, metrics, clustered_difference
+
+# fit_positions contains only positions assigned to the historical fit role.
+selected = sample_rows(fit_positions, historical_labels, seed=123, size=8000)
+scores = metrics(outcomes, tabpfn_probabilities)
+comparison = clustered_difference(
+    outcomes, tabpfn_probabilities, catboost_probabilities, match_ids,
+)
+```
+
+Sampling preserves the source algorithm: permute each class with NumPy's seeded
+random generator, take class counts proportional to pool prevalence using
+Python's ties-to-even rounding, then shuffle the combined sample. For the same
+pool and seed, smaller samples have nested membership; their output order is
+not a prefix of larger samples. Positions must be unique and in bounds. Sizes
+from zero through the pool size are accepted. The exact ordered frozen sample
+uses seed 123 and 8,000 shots; merely matching its prevalence is insufficient.
+
+Historical fit, calibration, validation and evaluation roles are match-disjoint.
+The research first reserved the original shot-level test subset, then assigned
+matches from the remaining rows to those four roles. The original test subset
+is not another match-disjoint role. This module samples an already assigned fit
+pool; it does not recreate or change splits. Historical reconstruction remains
+Task 9. The external test uses 908 shots (102 goals) from 34 previously unseen
+Bayer Leverkusen Bundesliga 2023/24 fixtures, including both teams. Model and
+calibration choices were frozen before that evaluation.
+
+`metrics` returns log loss (penalizes confident errors), Brier score (mean squared
+probability error), ROC AUC (ranking with half credit for ties), predicted and
+observed goal rates, shot count and goal count. Lower log loss/Brier and higher
+AUC are better. Inputs must be aligned, nonempty binary labels and finite
+probabilities in `[0,1]`; alignment is positional, so join by shot ID first.
+Single-class samples return NaN AUC. Log loss clips at float64 machine epsilon;
+Brier and AUC use the original probabilities.
+
+`clustered_difference` returns log-loss and Brier differences **first model minus
+second model** and percentile 95% intervals. Negative differences favor the
+first model. Defaults reproduce 2,000 bootstrap replicates with seed 123, drawing
+34 whole matches with replacement for the external sample, using identical draws
+for both models and metrics. Every shot in a selected match is included, repeated
+matches contribute repeatedly, and the resulting means are weighted by shots,
+not equally by match. Intervals use NumPy's linear 2.5%/97.5% quantiles. Match IDs
+must be aligned, nonmissing and sortable. Explicit `seed` and `replicates`
+arguments support other analyses; keep defaults for frozen reproduction.
+
+The research bootstrap clips probabilities at `1e-15` for log loss and carries
+those clipped values into its Brier differences. This endpoint behavior is
+preserved; aggregate `metrics` retains its separate source conventions.
+Intervals quantify match-resampling uncertainty, not training uncertainty or
+transportability to other leagues. Frozen intervals favor TabPFN over the tested
+CatBoost baseline for both losses; intervals versus StatsBomb include zero.
+StatsBomb has better point estimates. This one-club sample does not establish
+superiority over StatsBomb or all conventional models.
+
+Task 7 validation on Python 3.14.5:
+
+```sh
+.venv/bin/python -m compileall -q src scripts tests
+.venv/bin/python -m unittest discover -s tests -p 'test_evaluation.py' -v
+.venv/bin/python -m unittest discover -s tests -v
+TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pip check
+git diff --check
+```
+
+Compilation and dependency checks passed. Evaluation-only discovery: eight
+passed, two source-dependent tests skipped. Full portable suite: 50 passed,
+12 skipped. With the recorded research snapshot: all 62 backend tests passed.
+The ordered 8,000 fit IDs match exactly; all three external models' metrics and
+both paired comparisons' estimates/intervals match frozen outputs at absolute
+tolerance `2e-14` (`rtol=0`). All 76 source hashes remain unchanged. Optional
+sampling parity reads a trusted local pickle; never load untrusted pickles.
+No research data are distributed by this task, and no model fitting, inference
+or frontend checks were performed.
