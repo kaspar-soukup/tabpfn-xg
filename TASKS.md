@@ -1,6 +1,6 @@
 # Hackathon task list
 
-This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1 and 2 are implemented and ready for review; later tasks remain pending approval.
+This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–3 are implemented and ready for review; later tasks remain pending approval.
 
 ## Working agreement
 
@@ -24,7 +24,7 @@ This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small
 
 ## Task checklist
 
-Tasks 1 and 2 are implemented. Tasks 3 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
+Tasks 1–3 are implemented. Tasks 4 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
 
 ### 1. Review research and record provenance
 
@@ -45,8 +45,8 @@ Tasks 1 and 2 are implemented. Tasks 3 onward remain pending approval. The seque
 
 ### 3. Migrate event conversion and eligibility
 
-- [ ] Extract public event conversion into `src/tabpfn_xg/data.py` with explicit inputs.
-- [ ] Port tests for eligible shots, exclusions, unknown categories, and independence from outcomes and supplied xG.
+- [x] Extract public event conversion into `src/tabpfn_xg/data.py` with explicit inputs.
+- [x] Port tests for eligible shots, exclusions, unknown categories, and independence from outcomes and supplied xG.
 - **Depends on:** 1–2.
 - **Acceptance:** Conversion produces the expected schema and labels; target and reference xG values cannot influence predictors.
 - **Validation:** Conversion tests using small event fixtures.
@@ -238,3 +238,21 @@ Review status:
 - **Final validation:** Repeated the editable install, compilation, discovery, source-dependent backend tests, and `pip check` above after the Python declaration; results remained successful (four skips without the research root; four passes with it). From `/private/tmp`, `/Users/kasparsoukup/Documents/_Documents/Projects/tabpfn-xg/.venv/bin/python -I -c 'import tabpfn_xg; from importlib.metadata import metadata; info = metadata("tabpfn-xg"); assert info["Requires-Python"] == "~=3.14.0"; print(info["Version"], info["Requires-Python"])'` passed and reported `0.1.0 ~=3.14.0`. `git diff --check` and `git diff --cached --check` passed.
 - **Limitations/decisions needed:** Verification used Python 3.14.5. No pipeline, data, model, UI, or license migration was undertaken. Future optional dependencies remain subject to their affected tasks.
 - **Review status:** Task 2 implementation and compilation complete; ready for user review. Task 3 has not started. The requested commit includes the previously uncommitted Task 1 provenance work alongside Task 2.
+
+### Task 3 — Migrate event conversion and eligibility (2026-10-06)
+
+- **Authorization:** User requested Task 3, prior-document review, findings, tests, and a commit. Scope and files/dependencies/checks were detailed before implementation.
+- **Changed files:** `src/tabpfn_xg/data.py`, `tests/test_data.py`, `tests/test_data_parity.py`, `pyproject.toml`, `provenance/TASK_3_CONVERSION.md`, `README.md`, `TASKS.md`.
+- **Findings:** Original notebooks and frozen converter agree on eligibility, first opposition keeper, category encodings, 37 base predictors and labels. Preserved missing-keeper/type exclusions and kept outcome/reference xG outside predictors. Findings note records dependency decisions, validation boundary improvements, fixture corrections and Task 4 handoff.
+- **Validation commands/results (Python 3.14.5; NumPy 2.5.3; pandas 2.3.3):**
+  - `.venv/bin/python -m pip install -e .` — passed after approved network retry; initial sandbox attempt could not resolve PyPI for the build dependency.
+  - `.venv/bin/python -m compileall -q src scripts tests` — passed.
+  - `.venv/bin/python -m unittest discover -s tests -v` — 11 conversion tests passed; six source-dependent tests skipped.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v` — all 17 backend tests passed, including the four provenance checks and two full conversion parity checks.
+  - `.venv/bin/python -m pip check` — passed, no broken requirements.
+  - `git diff --check` and `git diff --cached --check` — passed before commit.
+- **Results:** Historical conversion: 45,185 eligible of 45,719 shots, 499 type exclusions and 35 missing keepers. External: 908 eligible of 916 shots, eight type exclusions and zero missing keepers across the 34 recorded match files. Base predictors match frozen outputs at absolute tolerance `2e-14`; labels and identifiers match exactly; external supplied xG is unchanged. Existing source hashes pass. No inference or research changes.
+- **Frontend validation:** Not applicable; no frontend tests or UI checks.
+- **README updates:** Native JSON/flattened input usage, ordered output/metadata separation, eligibility, validation errors, coordinate conventions, source attribution, dependencies, exact validation commands/results and limitations.
+- **Limitations/decisions needed:** Additional 13 geometry features remain Task 4; data downloads, model/calibration/evaluation interfaces and distribution remain later tasks. Optional parity checks require trusted local source data. No outstanding Task 3 requirement question.
+- **Review status:** Task 3 implementation and compilation complete; ready for user review. Stop here; Task 4 is not started or authorized.
