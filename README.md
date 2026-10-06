@@ -2,7 +2,7 @@
 
 Hackathon project in preparation: explore football scoring chances with TabPFN-3.5, compare predictions, and test your football intuition.
 
-Tasks 1–7 (research review, package setup, event conversion, the shared 50-feature builder, probability checks/calibration, model construction/interfaces, and sampling/evaluation) are implemented and ready for review. The application remains a later task. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
+Tasks 1–8 (research review, package setup, event conversion, the shared 50-feature builder, probability checks/calibration, model construction/interfaces, sampling/evaluation, and portable demo preparation) are implemented and ready for review. The application remains a later task. See the [implementation plan](IMPLEMENTATION_PLAN.md) and [task checklist](TASKS.md).
 
 The supported Python release series is 3.14 (`>=3.14,<3.15`). Development setup was verified in a fresh virtual environment with Python 3.14.5:
 
@@ -16,7 +16,7 @@ python -m unittest discover -s tests -v
 python -m pip check
 ```
 
-Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 50 portable backend tests; twelve additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. Optional model extras are described below; no app extra is available yet. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
+Installation downloads setuptools for the isolated build and the NumPy/pandas runtime dependencies used by conversion. Tests use standard-library `unittest`. Discovery runs 59 portable backend tests; thirteen additional parity/provenance tests skip without the research snapshot. Run the source-dependent command below to validate them. Optional model extras are described below; no app extra is available yet. See the [Task 2 findings](provenance/TASK_2_SETUP.md). Older Python versions have not been checked.
 
 The implementation will come from the original acquisition/processing notebooks and the frozen geometry/external research pipeline. The [portable provenance manifest](provenance/research_manifest.json) records 76 source hashes, exact ordered 8,000 fit shot IDs, historical/external match IDs, ordered 50 features, model settings and calibration. The [research handoff](provenance/RESEARCH_HANDOFF.md) explains migration pitfalls, artifact sizes, verification results and unresolved historical acquisition metadata.
 
@@ -28,7 +28,7 @@ python3 -m compileall -q scripts tests
 TABPFN_RESEARCH_ROOT=/path/to/tabPFN python3 -m unittest discover -s tests -v
 ```
 
-These checks passed against the recorded local snapshot; four provenance tests and all 14 existing research backend tests passed. Without `TABPFN_RESEARCH_ROOT`, source-dependent tests skip. The verifier reads references only, performs no inference and needs no token. A clean checkout contains the provenance record, but not the research data; portable data preparation and demo assets are later tasks.
+These checks passed against the recorded local snapshot; four provenance tests and all 14 existing research backend tests passed. Without `TABPFN_RESEARCH_ROOT`, source-dependent tests skip. The verifier reads references only, performs no inference and needs no token. A clean checkout contains provenance and frozen model predictions. The external demo preparation command below obtains source data directly; historical research data are not included.
 
 Frozen external evidence covers 908 eligible shots from 34 Bayer Leverkusen Bundesliga 2023/24 fixtures (both teams). TabPFN improves on the tested equal-data CatBoost baseline; it does not establish superiority over StatsBomb or all xG models. Source data originate from StatsBomb Open Data; the manifest pins commit `4b73468fc5b0f1950f9f66fada70ad3a4f9327cb`. Distribution/licensing and historical public-input reconstruction remain pending. No app launch command is available yet.
 
@@ -241,7 +241,7 @@ CatBoost uses depth 4, 200 iterations, learning rate 0.1, L2 penalty 10, seed
 Importing this module needs neither a token nor either optional model package.
 Cached mode uses the previously calibrated CSV predictions and
 `calibration.probability_check`; it never constructs/fits a model or recalibrates
-those values. Portable assets and the cached application are still later tasks.
+those values. Portable external preparation is described below; the cached application remains a later task.
 
 Optional extras pin the model package versions recorded in the research
 manifest. Install only the extra needed for explicit model work:
@@ -393,3 +393,104 @@ tolerance `2e-14` (`rtol=0`). All 76 source hashes remain unchanged. Optional
 sampling parity reads a trusted local pickle; never load untrusted pickles.
 No research data are distributed by this task, and no model fitting, inference
 or frontend checks were performed.
+
+
+## External demo assets
+
+The [portable inputs](assets/external/README.md) contain 908 shot IDs with frozen,
+already calibrated CatBoost/TabPFN predictions (70,219 bytes) and a source
+manifest (5,500 bytes). The user approved downloading StatsBomb data directly
+and generating the complete dataset locally in ignored `data/`. Source geometry,
+outcomes and supplied StatsBomb xG are not committed. These are checkout assets;
+run the following from the repository root after the editable installation.
+
+```sh
+.venv/bin/python scripts/prepare_data.py \
+  --source-manifest assets/external/source_manifest.json \
+  --predictions assets/external/model_predictions.csv \
+  --cache-dir data/external-cache \
+  --output data/external-demo
+```
+
+The first run downloads about 119.3 MB (34 match event files plus metadata) from
+StatsBomb commit `4b73468fc5b0f1950f9f66fada70ad3a4f9327cb`, competition 9,
+season 281. No research paths, historical data, optional model packages, token or
+inference are needed. Add `--offline` to require the existing verified cache;
+later runs can reuse downloads. Conversion excludes eight penalties from 916
+shots, leaving all 908 eligible shots, 102 goals and 34 matches. There is no
+outcome-based demo subset selection.
+
+The [preparation code](src/tabpfn_xg/assets.py) verifies every source/cache hash,
+uses the shared conversion and feature builder, and joins by unique shot ID in
+frozen prediction order. The canonical full-table digest verifies outcomes,
+match IDs, supplied xG and both model probabilities exactly. Duplicate, missing
+or extra IDs, invalid probabilities, changed source files or population counts
+fail before output is published. Cached model values are not recomputed or
+recalibrated. Corrupt cache files are not silently replaced; restore the pinned
+file or remove the corrupt local cache file before retrying. Verified files from
+an interrupted run remain reusable.
+
+`data/external-demo/` contains:
+
+- `shots.json` (3,431,925 bytes): 908 records containing `id`, `match_id`, binary
+  `outcome`, `catboost`, `tabpfn`, `statsbomb`, the ordered 50 predictors, and
+  `shot_freeze_frame`. All original visible frame players are retained.
+- `manifest.json` (5,374 bytes): pinned source, match/event/input/output hashes,
+  selected match IDs, eligibility counts, feature order and attribution. The
+  source-manifest hash uses canonical compact JSON rather than its indentation.
+
+The output directory appears only after validation. An identical rerun is
+accepted; an existing differing dataset is preserved and requires a new output
+path. Coordinates retain the StatsBomb 120×80 convention, attacking toward goal
+centre `(120,40)`. Distances are source coordinate units, not metres. Freeze
+frames describe observed players, not complete tracking.
+
+Load the local records without sacrificing float precision:
+
+```python
+import json
+from pathlib import Path
+import pandas as pd
+from tabpfn_xg.assets import checked_bytes
+from tabpfn_xg.features import FEATURES
+
+folder = Path("data/external-demo")
+manifest = json.loads((folder / "manifest.json").read_text())
+shots = pd.DataFrame(json.loads(checked_bytes(
+    folder / "shots.json", manifest["shots_sha256"],
+)))
+features = shots[list(FEATURES)]
+# shots.catboost/tabpfn are already calibrated; shots.statsbomb is supplied xG.
+```
+
+Data source: [StatsBomb Open Data](https://github.com/hudl/open-data). The pinned
+[source README](https://github.com/hudl/open-data/blob/4b73468fc5b0f1950f9f66fada70ad3a4f9327cb/README.md)
+requests attribution and a StatsBomb logo when publishing analysis; see the
+[official media pack](https://statsbomb.com/media-pack/) and
+[source agreement](https://github.com/hudl/open-data/blob/4b73468fc5b0f1950f9f66fada70ad3a4f9327cb/LICENSE.pdf).
+This task does not grant redistribution rights for the generated source-derived
+data. Publication/logo and project-license review remain Task 18.
+
+Task 8 validation on Python 3.14.5:
+
+```sh
+.venv/bin/python -m compileall -q src scripts tests
+.venv/bin/python -m unittest discover -s tests -p 'test_assets.py' -v
+.venv/bin/python -m unittest discover -s tests -v
+TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pip check
+git diff --check
+```
+
+Compilation, dependency and diff checks passed. Nine portable asset tests passed;
+the full portable suite has 59 passes and 13 source-dependent skips. All 72 tests
+pass with the research snapshot. Full asset parity compares all 908 rows and
+probabilities exactly, and all 50 features at `atol=2e-14`, `rtol=0`.
+
+A real download verified all 35 source files (119,286,882 bytes), followed by an
+identical offline rerun. The documented command with bundled inputs also passed
+in an isolated directory containing copied project files and that public cache,
+with no research paths or token configured. It imported the isolated source and
+produced byte-identical output in 1.53 seconds. This used the existing Python
+3.14 environment and installed NumPy/pandas; a fresh-environment release check
+remains Task 17. No inference, frontend tests or research-file changes occurred.

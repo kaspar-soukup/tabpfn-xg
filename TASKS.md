@@ -1,6 +1,6 @@
 # Hackathon task list
 
-This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–7 are implemented and ready for review; later tasks remain pending approval.
+This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small, reviewable steps. Tasks 1–8 are implemented and ready for review; later tasks remain pending approval.
 
 ## Working agreement
 
@@ -18,13 +18,13 @@ This checklist turns [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) into small
 
 - **UI:** Streamlit is proposed for a simple Python application; this is not yet a final selection.
 - **Python and dependencies:** Python 3.14 was selected by the user for Task 2. Keep model-training dependencies optional if practical; add requirements with the affected modules.
-- **Demo assets:** Confirm a portable, appropriately attributed way to distribute the real-shot geometry and cached predictions.
+- **Demo assets:** User approved tracking model probabilities/provenance and preparing all 908 source-derived shots locally from pinned public downloads. Source-derived data stay in ignored `data/`; publication/logo and final distribution review remain Task 18.
 - **Live inference:** Confirm the hosted model interface and required fit context before promising a setup command. No paid inference runs are authorized by this checklist.
 - **License:** Confirm the intended project license and upstream reuse requirements before adding one.
 
 ## Task checklist
 
-Tasks 1–7 are implemented. Tasks 8 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
+Tasks 1–8 are implemented. Tasks 9 onward remain pending approval. The sequence may be adjusted when inspection identifies a dependency; record the reason before changing it.
 
 ### 1. Review research and record provenance
 
@@ -87,8 +87,10 @@ Tasks 1–7 are implemented. Tasks 8 onward remain pending approval. The sequenc
 
 ### 8. Prepare portable external demo assets
 
-- [ ] Add a reproducible command to obtain external events from the pinned public source and join geometry to cached predictions by shot ID.
-- [ ] Package a practical demo dataset with provenance and attribution.
+- **Current status:** Implemented and validated. User approved portable model probabilities/provenance plus direct public-data downloads to build the complete local dataset, instead of redistributing source geometry/outcomes/xG.
+
+- [x] Add a reproducible command to obtain external events from the pinned public source and join geometry to cached predictions by shot ID.
+- [x] Package frozen model predictions and provenance; prepare the complete attributed demo dataset locally (user-approved distribution approach).
 - **Depends on:** 3–4, 7.
 - **Acceptance:** Joins are unique and complete for the selected demo shots; cached values are unchanged; a checkout does not need research-workspace paths.
 - **Validation:** Shot-ID integrity, required fields, probability checks, selected match IDs, and the full evaluation count of 908 shots when preparing the evaluation dataset.
@@ -329,3 +331,28 @@ Review status:
 - **README updates:** Utility usage, positional alignment, sampling protocol, historical split roles, metric meanings, paired uncertainty, clipping distinctions, evidence limitations, exact commands and results.
 - **Limitations/decisions needed:** Source parity requires the trusted research snapshot and reads a local pickle. Split reconstruction, portable assets and experiment CLI remain Tasks 8–10. No live/paid inference, model fitting, external tuning or new dependencies. No outstanding Task 7 questions.
 - **Review status:** Task 7 implementation and compilation complete; ready for user review. Task 8 has not started or been authorized.
+
+
+### Task 8 — Prepare portable external demo assets (2026-10-06)
+
+- **Authorization:** User requested Task 8 and explicitly approved tracking model predictions/provenance while downloading StatsBomb data directly and building all 908 shots locally in ignored `data/`. Scope/files/dependencies/checks described before coding. No inference or frontend work.
+- **Changed files:** `src/tabpfn_xg/assets.py`, `scripts/prepare_data.py`, `tests/test_assets.py`, `tests/test_assets_parity.py`, `assets/external/model_predictions.csv`, `assets/external/source_manifest.json`, `assets/external/README.md`, `README.md`, `TASKS.md`.
+- **Implementation:** Explicit-path pinned downloader with SHA-256 verification, offline cache reuse, shared conversion/features, strict unique/complete shot-ID joins, exact float64 probability preservation, population/digest verification and deterministic local dataset output. Differing existing output is preserved. The portable CSV projects only `id,catboost,tabpfn` from the frozen cache, retaining original decimal strings and order. The source manifest records original/cache hashes and a canonical full-table digest. No new runtime dependencies or model calls.
+- **Distribution decision:** The pinned StatsBomb agreement contains source-data redistribution restrictions (§1.2.1 and §7). User approved local reconstruction rather than committing source-derived geometry/outcomes/xG. StatsBomb attribution and upstream agreement/media links are included. Publication/logo and project-license review remain Task 18. This resolves the earlier full-versus-subset question: every eligible external shot is prepared locally.
+- **Validation commands/results (Python 3.14.5):**
+  - `.venv/bin/python -m compileall -q src scripts tests` — passed.
+  - `.venv/bin/python -m unittest discover -s tests -p 'test_assets.py' -v` — nine portable asset tests passed.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -p 'test_assets_parity.py' -v` — complete bundled-cache/source parity passed.
+  - `.venv/bin/python -m unittest discover -s tests -v` — 59 passed, 13 source-dependent skips.
+  - `TABPFN_RESEARCH_ROOT=/Users/kasparsoukup/Documents/_Documents/Projects/tabPFN .venv/bin/python -m unittest discover -s tests -v` — all 72 passed.
+  - `.venv/bin/python -m pip check` and `git diff --check` — passed.
+  - `.venv/bin/python scripts/prepare_data.py --source-manifest assets/external/source_manifest.json --predictions assets/external/model_predictions.csv --cache-dir data/external-cache --output data/external-demo --offline` — passed, producing 908 shots / 34 matches / 102 goals.
+  - Real network validation before final packaging used `.venv/bin/python scripts/prepare_data.py --source-manifest /private/tmp/tabpfn-task8-source.json --predictions /Users/kasparsoukup/Documents/_Documents/Projects/tabPFN/results/xg_external_bundesliga_2023_24/evaluation_predictions.csv --cache-dir data/external-cache --output data/external-download-check` — initial sandbox DNS failure; approved retry downloaded and verified all 35 pinned public files (119,286,882 bytes). Repeated with `--offline` — identical output.
+  - Isolated-copy verification copied `src/`, the preparation script, `assets/` and the public cache into a temporary directory, removed `TABPFN_RESEARCH_ROOT`/`TABPFN_TOKEN`, and used `PYTHONPATH=<temporary>/src` with the same portable CLI arguments above. Imported module path verified inside that copy; byte-identical output in 1.53 seconds. Initial path assertion was corrected to resolve macOS temporary-directory aliases. Existing installed NumPy/pandas were reused; this is not the Task 17 fresh-environment check.
+  - `git check-ignore data/external-cache/matches.json data/external-demo/shots.json` — both remain ignored.
+- **Results:** 908 unique shots, 34 selected matches, 102 goals; both model probabilities, source xG, outcomes and row order agree exactly with the frozen full cache. All 50 features agree within `2e-14` absolute tolerance. Portable tests protect provenance/cache integrity, download hashes, offline behavior, ID joins, source mismatches, deterministic output and refusal to overwrite drift. The source-dependent asset test validates every row/feature. All 76 research hashes remain unchanged.
+- **Asset sizes:** Tracked model CSV 70,219 bytes; source manifest 5,500 bytes. Generated local `shots.json` 3,431,925 bytes; `manifest.json` 5,374 bytes. Raw downloads remain ignored.
+- **README updates:** Complete research-independent preparation command, offline usage, cache recovery, schema/loading example, float precision, source attribution, measured sizes, isolated validation and limitations. Asset README describes the exact projection and digest.
+- **Frontend validation:** Not applicable; no frontend code or tests.
+- **Limitations/decisions needed:** First preparation needs public network access or a previously verified cache; generated source data are local assets, not granted redistribution rights. Checkout assets are not wheel package data. Historical fit reconstruction, UI, publication/logo and fresh-environment verification remain their later tasks. No outstanding Task 8 question.
+- **Review status:** Task 8 implementation and compilation complete; ready for user review. Task 9 has not started or been authorized.
